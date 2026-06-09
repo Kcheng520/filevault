@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FileVault — 文件分享</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+</head>
+<body>
+
+<!-- ===== NAV ===== -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="#" class="logo" onclick="showPage('main')">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">FileVault</span>
+    </a>
+  </div>
+</nav>
+
+<!-- ===== 主页面（上传 + 管理） ===== -->
+<section id="page-main" class="page">
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <nav class="sidebar-nav" style="margin-top:8px">
+        <a href="#" class="sidebar-link active" data-tab="files" onclick="switchTab('files',this);return false">
+          <span class="sidebar-icon">📁</span> 我的文件
+        </a>
+        <a href="#" class="sidebar-link" data-tab="shared" onclick="switchTab('shared',this);return false">
+          <span class="sidebar-icon">🔗</span> 分享链接
+        </a>
+        <a href="#" class="sidebar-link" data-tab="upload" onclick="switchTab('upload',this);return false">
+          <span class="sidebar-icon">⬆</span> 上传文件
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main class="dash-main">
+
+      <!-- 文件列表 -->
+      <div id="tab-files" class="tab-content active">
+        <div class="tab-header">
+          <h2>我的文件</h2>
+          <button class="btn btn-primary btn-sm" onclick="switchTab('upload',document.querySelector('[data-tab=upload]'))">+ 上传</button>
+        </div>
+        <div id="file-list" class="file-list">
+          <div class="loading-state"><div class="spinner"></div><p>加载中...</p></div>
+        </div>
+      </div>
+
+      <!-- 分享链接 -->
+      <div id="tab-shared" class="tab-content">
+        <div class="tab-header"><h2>分享链接</h2></div>
+        <div id="share-list" class="file-list">
+          <div class="loading-state"><div class="spinner"></div><p>加载中...</p></div>
+        </div>
+      </div>
+
+      <!-- 上传 -->
+      <div id="tab-upload" class="tab-content">
+        <div class="tab-header"><h2>上传文件</h2></div>
+        <div class="upload-area" id="upload-area"
+          onclick="document.getElementById('file-input').click()"
+          ondragover="dragOver(event)" ondrop="dropFile(event)" ondragleave="dragLeave(event)">
+          <span class="upload-icon">☁</span>
+          <p class="upload-text">点击或拖拽文件到此处上传</p>
+          <p class="upload-hint">支持所有文件类型 · 单文件最大 50MB</p>
+          <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)" />
+        </div>
+
+        <div id="upload-queue" style="display:none" class="upload-queue">
+          <h3 style="margin-bottom:12px;font-size:15px;color:var(--text-secondary)">待上传文件</h3>
+          <div id="queue-list"></div>
+          <div class="upload-options">
+            <label class="option-label">
+              <input type="checkbox" id="opt-password" onchange="togglePasswordInput()" />
+              <span>设置访问密码</span>
+            </label>
+            <div id="password-input-area" style="display:none;margin-top:10px">
+              <input type="text" id="share-password" placeholder="输入分享密码（留空则随机生成）" style="max-width:360px" />
+            </div>
+            <label class="option-label" style="margin-top:12px">
+              <input type="checkbox" id="opt-expiry" onchange="toggleExpiryInput()" />
+              <span>设置过期时间</span>
+            </label>
+            <div id="expiry-input-area" style="display:none;margin-top:10px">
+              <select id="share-expiry" style="width:200px">
+                <option value="1">1 天</option>
+                <option value="7" selected>7 天</option>
+                <option value="30">30 天</option>
+                <option value="0">永不过期</option>
+              </select>
+            </div>
+          </div>
+          <div id="upload-progress-area" style="display:none;margin-top:16px">
+            <div class="progress-bar"><div class="progress-fill" id="upload-progress-fill" style="width:0%"></div></div>
+            <p id="upload-progress-text" style="font-size:13px;color:var(--text-muted);margin-top:6px">准备上传...</p>
+          </div>
+          <button class="btn btn-primary" style="margin-top:16px" id="btn-upload" onclick="uploadFiles()">确认上传并生成链接</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</section>
+
+<!-- ===== 分享页（任何人可访问） ===== -->
+<section id="page-share" class="page">
+  <div class="share-container">
+    <div class="share-card">
+      <div class="share-icon">📦</div>
+      <h2 id="share-filename">加载中...</h2>
+      <p id="share-filesize" class="share-meta"></p>
+
+      <div id="share-loading" class="loading-state">
+        <div class="spinner"></div><p>加载中...</p>
+      </div>
+      <div id="share-password-area" style="display:none" class="password-area">
+        <p>此文件已加密，请输入访问密码</p>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="password" id="share-pwd-input" placeholder="访问密码" style="flex:1"
+            onkeydown="if(event.key==='Enter')verifySharePassword()" />
+          <button class="btn btn-primary" onclick="verifySharePassword()">验证</button>
+        </div>
+        <div id="share-pwd-error" class="error-msg" style="display:none;margin-top:8px">密码错误，请重试</div>
+      </div>
+      <div id="share-actions" style="display:none">
+        <button class="btn btn-primary btn-lg" id="btn-download" onclick="downloadSharedFile()">⬇ 下载文件</button>
+      </div>
+      <div id="share-expired" class="error-msg" style="display:none;margin-top:16px">此分享链接已过期</div>
+      <div id="share-not-found" class="error-msg" style="display:none;margin-top:16px">链接无效或文件已被删除</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 分享弹窗 ===== -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3>分享链接已生成 ✅</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="share-result">
+        <div class="share-result-icon">🎉</div>
+        <p id="modal-filename" class="share-result-name"></p>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">任何人通过此链接均可下载</p>
+      </div>
+      <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:6px">分享链接</label>
+      <div class="link-box">
+        <input type="text" id="modal-link" readonly />
+        <button class="btn btn-sm btn-primary" onclick="copyLink()">复制</button>
+      </div>
+      <div id="modal-password-section" style="display:none" class="password-display">
+        <span class="pwd-label">访问密码</span>
+        <span id="modal-password" class="pwd-value"></span>
+        <button class="btn btn-sm" onclick="copyPassword()">复制密码</button>
+      </div>
+      <div id="modal-expiry-section" style="display:none" class="expiry-display">
+        <span id="modal-expiry-text"></span>
+      </div>
+      <div id="copy-toast" class="copy-toast" style="display:none">已复制到剪贴板 ✓</div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
